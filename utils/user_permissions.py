@@ -4,9 +4,9 @@ from db.models import UsersTBL
 
 def admin_required(func):
     @wraps(func)
-    async def wrapper(clt, msg, *args, **kwargs):
+    async def wrapper(self, clt, msg, *args, **kwargs):
         if UsersTBL.get_or_none(UsersTBL.user_id == msg.from_user.id, UsersTBL.is_active == True):
-            return await func(clt, msg, *args, **kwargs)
+            return await func(self, clt, msg, *args, **kwargs)
         else:
             return await clt.access_denied(msg)
 

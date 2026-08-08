@@ -1,14 +1,14 @@
 import asyncio
-from config import API_ID, API_HASH
-from forwarder_client.bot import ForwardBot
-from db.models import init_database
+from config import API_ID, API_HASH, SUDO_IDS, TOKEN
+from client_manager.base import ClientManger
+from db.create_table import init_database
 
 
 async def main():
     print("##### CREATE DATABASE #####")
-    init_database()
+    init_database(SUDO_IDS)
     print("##### RUN BOT  #####")
-    bot = ForwardBot(name="ftag", api_hash=API_HASH, api_id=API_ID)
+    bot = ClientManger(name="ftag", api_hash=API_HASH, api_id=API_ID, bot_token=TOKEN)
     await bot.start()
 
 

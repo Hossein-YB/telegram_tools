@@ -4,6 +4,7 @@ from decouple import config
 # telegram api config
 API_ID = config("API_ID", cast=int)
 API_HASH = config("API_HASH")
+TOKEN = config("TOKEN")
 
 # sudo config
 SUDO_IDS = config("SUDO_ID", cast=lambda v: [int(s.strip()) for s in v.split(',')])
