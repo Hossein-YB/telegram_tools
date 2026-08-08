@@ -7,7 +7,7 @@ from pyrogram.handlers import MessageHandler
 import logging
 from db.models import ForwardMessage, GroupInfo, ForwardHistory
 from forwarder_client.messages import MessagesText
-from config import SUDO_IDS, FORWARD_INTERVAL_MINUTES
+from config import SUDO_IDS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
