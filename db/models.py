@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from typing import List, Optional
 from peewee import (Model, BooleanField, BigIntegerField, CharField, TextField, ForeignKeyField,
                     DateField, DateTimeField, AutoField, DoesNotExist)
@@ -36,7 +36,6 @@ class UsersTBL(BaseModel):
     name = CharField(max_length=50)
     is_sudo = BooleanField(default=False)
     is_active = BooleanField(default=True)
-    create_at = DateField(default=datetime.date.today)
 
     @classmethod
     def insert_user(cls, user_id, name, is_sudo=False) -> "UsersTBL":

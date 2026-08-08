@@ -1,2 +1,2 @@
-from .models import ForwardMessage, GroupInfo, ForwardHistory, db
+from .models import UsersTBL
 
