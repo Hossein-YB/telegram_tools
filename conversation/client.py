@@ -4,6 +4,7 @@ from typing import Optional, Callable, Dict, List, Union
 
 from pyrogram import Client
 from pyrogram.filters import Filter
+from pyrogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, ForceReply, Message
 
 from .utils.config import config
 from .utils.exceptions import ListenerTimeout, ListenerStopped
@@ -81,14 +82,15 @@ class CustomClient(Client):
             unallowed_click_alert: bool = True,
             user_id: Union[Union[int, str], List[Union[int, str]]] = None,
             message_id: Union[int, List[int]] = None,
+            reply_markup: InlineKeyboardMarkup | ReplyKeyboardMarkup | ReplyKeyboardRemove | ForceReply | None = None,
             inline_message_id: Union[str, List[str]] = None,
             *args,
             **kwargs,
-    ):
+    ) -> Optional[Message]:
         sent_message = None
         if text.strip() != "":
             chat_to_ask = chat_id[0] if isinstance(chat_id, list) else chat_id
-            sent_message = await self.send_message(chat_to_ask, text, *args, **kwargs)
+            sent_message = await self.send_message(chat_to_ask, text, reply_markup=reply_markup, *args, **kwargs)
 
         response = await self.listen(
             filters=filters,

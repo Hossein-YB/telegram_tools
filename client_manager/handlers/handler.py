@@ -1,5 +1,6 @@
 from conversation.message_handler import CustomMessageHandler as MessageHandler
-from conversation.callback_query_handler import CallbackQueryHandler as QueryHandler
+# from conversation.callback_query_handler import CallbackQueryHandler
+from pyrogram.handlers import CallbackQueryHandler
 from pyrogram import filters
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -14,3 +15,5 @@ class Handlers:
         self.add_handler(MessageHandler(self.start_command, filters.command("start")))
 
         self.add_handler(MessageHandler(self.admin_panel, filters.command("admin")))
+        self.add_handler(CallbackQueryHandler(self.add_new_op, filters.regex(f"^{self.keys.ADD_NEW_OPERATOR_CALL}$")))
+        self.add_handler(CallbackQueryHandler(self.add_new_op_from_start, filters.regex(f"^{self.keys.ADD_ADMIN_FROM_START_call}$")))

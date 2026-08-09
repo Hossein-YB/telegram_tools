@@ -71,6 +71,14 @@ class UsersTBL(BaseModel):
             return []
 
     @classmethod
+    def get_sudo(cls) -> List["UsersTBL"]:
+        try:
+            return cls.select().where(cls.is_sudo == True)
+        except Exception as e:
+            logger.error(f"get_admins failed: {e}")
+            return []
+
+    @classmethod
     def get_admin(cls, user_id) -> Optional["UsersTBL"]:
         try:
             return cls.get_or_none(cls.user_id == user_id)

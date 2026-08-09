@@ -57,4 +57,13 @@ class Keyboards:
             ],
         ])
 
+    ADD_ADMIN_FROM_START_TXT = "اضافه کردن به لیست اوپراتور ها"
+    ADD_ADMIN_FROM_START_call = "a_add_op_st"
 
+    @classmethod
+    def generate_add_new_admin_from_start_keyboard(cls):
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(text=cls.ADD_ADMIN_FROM_START_TXT, callback_data=cls.ADD_ADMIN_FROM_START_call),
+            ],
+        ])
