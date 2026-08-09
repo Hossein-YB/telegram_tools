@@ -77,3 +77,17 @@ class UsersTBL(BaseModel):
         except Exception as e:
             logger.error(f"get_admin failed for {user_id}: {e}")
             return None
+
+    @classmethod
+    def check_is_admin(cls, user_id: int) -> bool:
+        if cls.get_or_none(cls.user_id == user_id, cls.is_active == True):
+            return True
+        else:
+            return False
+
+    @classmethod
+    def check_is_sudo(cls, user_id: int) -> bool:
+        if cls.get_or_none(cls.user_id == user_id, cls.is_sudo == True):
+            return True
+        else:
+            return False

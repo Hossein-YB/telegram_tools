@@ -1,11 +1,12 @@
 from conversation.client import CustomClient
+from .admin.admin import AdminCommand
 from .message.Messages import Messages
 from .handlers.handler import Handlers
 from .message.keyboards import Keyboards
 from .public_method import PublicMethods
 
 
-class ClientManger(PublicMethods, Handlers, CustomClient):
+class ClientManger(AdminCommand, PublicMethods, Handlers, CustomClient):
 
     def __init__(self, name, api_id, api_hash, bot_token, **kwargs):
         self.texts = Messages()

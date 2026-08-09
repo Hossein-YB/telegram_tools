@@ -12,3 +12,5 @@ class Handlers:
 
     def set_handlers_public_methods(self: "ClientManger"):
         self.add_handler(MessageHandler(self.start_command, filters.command("start")))
+
+        self.add_handler(MessageHandler(self.admin_panel, filters.command("admin")))

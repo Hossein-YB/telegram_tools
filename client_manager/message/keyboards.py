@@ -25,24 +25,24 @@ class Keyboards:
     def generate_remove_keyboard(cls):
         return ReplyKeyboardRemove()
 
-    # sudo keyboards
+    # admin keyboards
     SHOW_USERS_TXT = "کاربران"
-    SHOW_USERS_CALL = "s_sh_users"
+    SHOW_USERS_CALL = "a_sh_users"
 
     ADD_NEW_OPERATOR_TXT = "اضافه کردن کاربر"
-    ADD_NEW_OPERATOR_CALL = "s_ad_user"
+    ADD_NEW_OPERATOR_CALL = "a_ad_user"
 
     SHOW_ACCOUNTS_TXT = "اکانت ها"
-    SHOW_ACCOUNTS_CALL = "s_sh_account"
+    SHOW_ACCOUNTS_CALL = "a_sh_account"
 
     ADD_NEW_ACCOUNT_TXT = "اضافه کردن اکانت"
-    ADD_NEW_ACCOUNT_CALL = "s_ad_account"
+    ADD_NEW_ACCOUNT_CALL = "a_ad_account"
 
     SHOW_GROUPS_TXT = "گروه ها"
-    SHOW_GROUPS_CALL = "s_groups"
+    SHOW_GROUPS_CALL = "a_groups"
 
     @classmethod
-    def generate_sudo_keyboards(cls):
+    def generate_admin_keyboards(cls):
         return InlineKeyboardMarkup([
             [
                 InlineKeyboardButton(text=cls.ADD_NEW_OPERATOR_TXT, callback_data=cls.ADD_NEW_OPERATOR_CALL),
