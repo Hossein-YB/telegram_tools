@@ -20,4 +20,4 @@ BASE_DIR = os.getcwd()
 LOG_FILE_PATH = os.path.join(BASE_DIR, 'logs')
 
 # session path
-SESSIONS_PATH = os.path.join(BASE_DIR, 'session')
+SESSIONS_PATH = os.path.join(BASE_DIR, 'sessions')

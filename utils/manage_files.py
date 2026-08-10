@@ -20,7 +20,3 @@ def session_directory() -> str:
 
 def generate_session_path(name: str) -> str:
     return os.path.join(session_directory(), name)
-
-
-if __name__ == '__main__':
-    print(BASE_DIR, generate_session_path("+989129875252"))
