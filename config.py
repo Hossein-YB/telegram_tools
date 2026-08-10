@@ -16,5 +16,8 @@ DB_USER_PASS = config("DB_USER_PASS")
 DB_PORT = config("DB_PORT", cast=int)
 
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+BASE_DIR = os.getcwd()
 LOG_FILE_PATH = os.path.join(BASE_DIR, 'logs')
+
+# session path
+SESSIONS_PATH = os.path.join(BASE_DIR, 'session')
