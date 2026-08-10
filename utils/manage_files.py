@@ -19,4 +19,5 @@ def session_directory() -> str:
 
 
 def generate_session_path(name: str) -> str:
+    name = name.replace("+", "")
     return os.path.join(session_directory(), name)

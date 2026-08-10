@@ -1,3 +1,6 @@
+from pyrogram import enums
+
+
 class Messages:
     CAN_NOT_START_BOT = " شما نمیتوانید ربات را استارت کنید. به پشتیبانی پیام دهید."
     CANCELED_COMMAND = "عملیات با موفقیت متوقف شد"
@@ -26,3 +29,14 @@ class Messages:
             f"کاربر [{name}](tg://user?id={user_id}) ربات را استارت کرد\n"
             f"درصورت تایید برای اضافه کردن کابری برای استفاده ربات از دکمه زیر استفاده کنید"
         )
+
+    @classmethod
+    def get_code_telegram_in_app(cls, sent_code):
+        descriptions = {
+            enums.SentCodeType.APP: "برنامه تلگرام",
+            enums.SentCodeType.SMS: "پیامک",
+            enums.SentCodeType.CALL: "تماس تلفنی",
+            enums.SentCodeType.FLASH_CALL: "phone flash call",
+            enums.SentCodeType.FRAGMENT_SMS: "Fragment",
+            enums.SentCodeType.EMAIL_CODE: "ایمیل"
+        }
