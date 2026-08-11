@@ -75,4 +75,4 @@ class ForwardBot(Client):
         self._initialized = False
 
         if self.is_connected:
-            await self.disconnect()
+            await self.stop()

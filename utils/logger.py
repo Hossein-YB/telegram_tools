@@ -52,7 +52,7 @@ class LoggerSetup:
         else:
             logger = self.logger
 
-        logger.setLevel(logging.ERROR)
+        logger.setLevel(logging.INFO)
         logger.propagate = True
         return logger
 

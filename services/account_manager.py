@@ -263,45 +263,45 @@ class AccountManager:
             except Exception:
                 pass
 
-
-async def main():
-    manager = AccountManager(idle_timeout=300, check_interval=30,)
-    await manager.start()
-
-    phone = input("Phone number: ").strip()
-
-    try:
-        sent_code = await manager.new_client(phone)
-
-        code = input("Code: ").strip()
-
-        password = input(
-            "2FA Password (leave empty if none): "
-        ).strip()
-
-        client = await manager.verify_code(
-            phone_number=phone,
-            phone_code=code,
-            password=password or None,
-        )
-
-        print()
-        print("Login successful")
-        print(f"User ID: {client.me.id}")
-        print(f"Name: {client.me.first_name}")
-        print(f"Username: @{client.me.username}")
-
-        print()
-        print(
-            "Active accounts:",
-            manager.active_accounts(),
-        )
-
-        await asyncio.sleep(10)
-
-    finally:
-        await manager.stop()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+#
+# async def main():
+#     manager = AccountManager(idle_timeout=300, check_interval=30,)
+#     await manager.start()
+#
+#     phone = input("Phone number: ").strip()
+#
+#     try:
+#         sent_code = await manager.new_client(phone)
+#
+#         code = input("Code: ").strip()
+#
+#         password = input(
+#             "2FA Password (leave empty if none): "
+#         ).strip()
+#
+#         client = await manager.verify_code(
+#             phone_number=phone,
+#             phone_code=code,
+#             password=password or None,
+#         )
+#
+#         print()
+#         print("Login successful")
+#         print(f"User ID: {client.me.id}")
+#         print(f"Name: {client.me.first_name}")
+#         print(f"Username: @{client.me.username}")
+#
+#         print()
+#         print(
+#             "Active accounts:",
+#             manager.active_accounts(),
+#         )
+#
+#         await asyncio.sleep(10)
+#
+#     finally:
+#         await manager.stop()
+#
+#
+# if __name__ == "__main__":
+#     asyncio.run(main())
