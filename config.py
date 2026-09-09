@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from decouple import config
 
 # telegram api config
@@ -15,9 +15,15 @@ DB_USER = config("DB_USER")
 DB_USER_PASS = config("DB_USER_PASS")
 DB_PORT = config("DB_PORT", cast=int)
 
+# Base directory
+BASE_DIR = Path(__file__).parent.resolve()
 
-BASE_DIR = os.path.dirname(__file__)
-LOG_FILE_PATH = os.path.join(BASE_DIR, 'logs')
+# Logs directory
+LOG_FILE_PATH = BASE_DIR / 'logs'
 
-# session path
-SESSIONS_PATH = os.path.join(BASE_DIR, 'sessions')
+# Sessions directory
+SESSIONS_PATH = BASE_DIR / 'sessions'
+
+# Optional: Create directories on import
+LOG_FILE_PATH.mkdir(parents=True, exist_ok=True)
+SESSIONS_PATH.mkdir(parents=True, exist_ok=True)
