@@ -1,7 +1,7 @@
 from pathlib import Path
 from decouple import config
 
-# telegram api config
+# telegram_client api config
 API_ID = config("API_ID", cast=int)
 API_HASH = config("API_HASH")
 TOKEN = config("TOKEN")

@@ -1,22 +1,10 @@
-from typing import List
-from db.models import (database, UsersTBL,
-                       AccountsTBL,
-                       GroupsTBL,
-                       AccountCategoryTBL,
-                       AccountGroupTBL,
-                       ForwardHistoryTBL, )
-from config import SUDO_IDS
+from typing import Iterable
+
+from db.models import TABLES, database, UsersTBL
 
 
-def init_database(sudo_ids: List[int]):
+def init_database(sudo_ids: Iterable[int]):
     with database:
-        database.create_tables([
-            UsersTBL,
-            AccountsTBL,
-            GroupsTBL,
-            AccountCategoryTBL,
-            AccountGroupTBL,
-            ForwardHistoryTBL
-        ])
-        for sudo in sudo_ids:
-            UsersTBL.insert_user(sudo, f"sudo{sudo_ids.index(sudo)}", True)
+        database.create_tables(TABLES, safe=True)
+        for index, sudo_id in enumerate(sudo_ids):
+            UsersTBL.insert_user(sudo_id, f"sudo{index}", True)
