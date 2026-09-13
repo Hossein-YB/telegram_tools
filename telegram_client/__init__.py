@@ -1,3 +1,3 @@
-from .base import TelegramClient
+from .telegram_client import TelegramClient
 
 __all__ = ["TelegramClient"]

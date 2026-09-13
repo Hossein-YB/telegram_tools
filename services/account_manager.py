@@ -1,75 +1,90 @@
-import asyncio
-import time
-from typing import Optional, Callable, Awaitable, Any
+from typing import Any, Awaitable, Callable, Optional
 
 from pyrogram.errors import SessionPasswordNeeded
 from pyrogram.types import SentCode
 
-from config import API_ID, API_HASH
+from config import API_HASH, API_ID
 from db.models import (
-    UsersTBL,
+    AccountGroupTBL,
     AccountsTBL,
     GroupsTBL,
-    AccountGroupTBL,
     TelegramOperationTBL,
+    UsersTBL,
 )
-from telegram_client.base import TelegramClient
+from telegram_client.telegram_client import TelegramClient
 from utils.logger import get_logger
-from utils.manage_files import generate_session_path, delete_session_file
+from utils.manage_files import delete_session_file, generate_session_path
 
 logger = get_logger(__name__)
 
 
 class AccountManager:
-    """Account lifecycle + DB persistence + operation logging.
+    """Manage Telegram accounts belonging to one bot operator."""
 
-    TelegramClient is intentionally kept DB-free. All DB writes stay here/models.
-    """
+    def __init__(self, operator_id: int):
+        operator = UsersTBL.get_user(operator_id)
+        if not operator:
+            raise ValueError(f"Operator/user {operator_id} not found")
 
-    def __init__(self, idle_timeout: int = 300, check_interval: int = 30):
+        self.operator_id = operator_id
+        self.operator = operator
+
+        self.accounts: dict[int, AccountsTBL] = {
+            account.account_id: account
+            for account in AccountsTBL.get_admin_accounts(operator_id)
+        }
+
         self.clients: dict[int, TelegramClient] = {}
+
         self.pending_clients: dict[str, TelegramClient] = {}
         self.pending_codes: dict[str, SentCode] = {}
-        self.idle_timeout = idle_timeout
-        self.check_interval = check_interval
-        self._last_usage: dict[int, float] = {}
-        self._monitor_task: asyncio.Task | None = None
-        self._running = False
 
-    async def start(self):
-        if self._running:
-            return
-        self._running = True
-        self._monitor_task = asyncio.create_task(self._idle_monitor())
-        logger.info("AccountManager started")
+    def refresh_accounts(self) -> dict[int, AccountsTBL]:
+        self.accounts = {
+            account.account_id: account
+            for account in AccountsTBL.get_admin_accounts(self.operator_id)
+        }
+        return self.accounts
 
-    async def stop(self):
-        if not self._running:
-            return
-        self._running = False
-        if self._monitor_task:
-            self._monitor_task.cancel()
-            try:
-                await self._monitor_task
-            except asyncio.CancelledError:
-                pass
-            self._monitor_task = None
+    def get_account(self, account_id: int) -> AccountsTBL:
+        account = self.accounts.get(account_id)
 
-        for account_id in list(self.clients):
-            await self.disconnect_account(account_id)
-        for phone in list(self.pending_clients):
-            await self._cleanup_pending(phone)
+        if account is None:
+            account = AccountsTBL.get_account(account_id)
 
-        logger.info("AccountManager stopped")
+            if account and account.admin_id == self.operator_id:
+                self.accounts[account_id] = account
+            else:
+                account = None
 
-    async def start_login(self, admin_id: int, phone_number: str) -> SentCode:
-        """Create/reuse the account record, connect and send Telegram login code."""
-        admin = UsersTBL.get_user(admin_id)
-        if not admin:
-            raise ValueError(f"Admin/user {admin_id} not found")
+        if account is None:
+            raise ValueError(
+                f"Account {account_id} does not belong to operator {self.operator_id}"
+            )
 
+        return account
+
+    def get_accounts(self) -> list[AccountsTBL]:
+        return list(self.accounts.values())
+
+    def active_accounts(self) -> list[int]:
+        return list(self.clients.keys())
+
+    def active_clients(self) -> dict[int, TelegramClient]:
+        return self.clients.copy()
+
+    def is_connected(self, account_id: int) -> bool:
+        client = self.clients.get(account_id)
+        return bool(client and client.is_connected)
+
+    async def start_login(self, phone_number: str) -> SentCode:
         account = AccountsTBL.get_by_phone(phone_number)
+
+        if account and account.admin_id != self.operator_id:
+            raise ValueError("This Telegram account belongs to another operator")
+
         session_path = generate_session_path(phone_number)
+
         if account and account.is_authorized:
             raise ValueError(f"Account {phone_number} is already authorized")
 
@@ -77,10 +92,17 @@ class AccountManager:
             return self.pending_codes[phone_number]
 
         if not account:
-            account = AccountsTBL.insert_account(admin, phone_number, str(session_path))
+            account = AccountsTBL.insert_account(
+                self.operator,
+                phone_number,
+                str(session_path),
+            )
+            self.accounts[account.account_id] = account
+
         elif not account.session_path:
             account.session_path = str(session_path)
             account.save()
+            self.accounts[account.account_id] = account
 
         client = TelegramClient(
             name=str(session_path),
@@ -91,34 +113,74 @@ class AccountManager:
 
         try:
             authorized = await client.login(phone_number)
+
             if authorized:
                 me = client.me or await client.load_me()
-                AccountsTBL.update_login(account.account_id, me, str(session_path))
+
+                AccountsTBL.update_login(
+                    account.account_id,
+                    me,
+                    str(session_path),
+                )
+
+                self.accounts[account.account_id] = account
+
                 await client.disconnect_client()
-                raise ValueError(f"Account {phone_number} is already authorized")
+
+                raise ValueError(
+                    f"Account {phone_number} is already authorized"
+                )
 
             sent_code = await client.send_code(phone_number)
+
             self.pending_clients[phone_number] = client
             self.pending_codes[phone_number] = sent_code
-            AccountsTBL.set_status(account.account_id, "waiting_code")
-            self._log(account, "login.send_code", result="code_sent")
+
+            AccountsTBL.set_status(
+                account.account_id,
+                "waiting_code",
+            )
+
+            self._log(
+                account,
+                "login.send_code",
+                result="code_sent",
+            )
+
             return sent_code
+
         except Exception as exc:
-            self._log(account, "login.send_code", status="failed", error=str(exc))
+            self._log(
+                account,
+                "login.send_code",
+                status="failed",
+                error=str(exc),
+            )
+
             if phone_number not in self.pending_clients:
                 await client.disconnect_client()
+
             raise
 
-    async def verify_login(self, phone_number: str, phone_code: str, password: Optional[str] = None) -> AccountsTBL:
-        """Finish Telegram login and persist the Telegram profile."""
+    async def verify_login(
+        self,
+        phone_number: str,
+        phone_code: str,
+        password: Optional[str] = None,
+    ) -> AccountsTBL:
         client = self.pending_clients.get(phone_number)
         code = self.pending_codes.get(phone_number)
         account = AccountsTBL.get_by_phone(phone_number)
 
         if not client or not code:
-            raise ValueError(f"No pending login for {phone_number}")
-        if not account:
-            raise ValueError(f"Account {phone_number} not found")
+            raise ValueError(
+                f"No pending login for {phone_number}"
+            )
+
+        if not account or account.admin_id != self.operator_id:
+            raise ValueError(
+                "This Telegram account does not belong to this operator"
+            )
 
         try:
             try:
@@ -127,159 +189,341 @@ class AccountManager:
                     phone_code_hash=code.phone_code_hash,
                     phone_code=phone_code,
                 )
+
             except SessionPasswordNeeded:
                 if not password:
-                    raise ValueError("Two-step verification password is required")
+                    raise ValueError(
+                        "Two-step verification password is required"
+                    )
+
                 await client.check_password(password)
 
             me = await client.load_me()
-            AccountsTBL.update_login(account.account_id, me, account.session_path)
+
+            AccountsTBL.update_login(
+                account.account_id,
+                me,
+                account.session_path,
+            )
+
+            self.accounts[account.account_id] = account
             self.clients[account.account_id] = client
-            self._last_usage[account.account_id] = time.monotonic()
+
             self._clear_pending(phone_number)
-            self._log(account, "login.verify", result=f"telegram_user_id={me.id}")
+
+            self._log(
+                account,
+                "login.verify",
+                result=f"telegram_user_id={me.id}",
+            )
+
             return account
+
         except Exception as exc:
-            self._log(account, "login.verify", status="failed", error=str(exc))
+            self._log(
+                account,
+                "login.verify",
+                status="failed",
+                error=str(exc),
+            )
             raise
 
-    async def connect_account(self, account_id: int) -> TelegramClient:
-        """Connect an already-authorized account using its saved session."""
+    async def connect_account(
+        self,
+        account_id: int,
+    ) -> TelegramClient:
+        account = self.get_account(account_id)
+
         existing = self.clients.get(account_id)
+
         if existing and existing.is_connected:
-            self._touch(account_id)
             return existing
 
-        account = AccountsTBL.get_account(account_id)
-        if not account:
-            raise ValueError(f"Account {account_id} not found")
         if not account.is_authorized:
-            raise ValueError(f"Account {account_id} is not authorized")
-        if not account.is_active:
-            raise ValueError(f"Account {account_id} is disabled")
-        if not account.session_path:
-            raise ValueError(f"Account {account_id} has no session path")
+            raise ValueError(
+                f"Account {account_id} is not authorized"
+            )
 
-        client = TelegramClient(name=account.session_path, api_id=API_ID, api_hash=API_HASH, phone_number=account.phone_number)
+        if not account.is_active:
+            raise ValueError(
+                f"Account {account_id} is disabled"
+            )
+
+        if not account.session_path:
+            raise ValueError(
+                f"Account {account_id} has no session path"
+            )
+
+        client = TelegramClient(
+            name=account.session_path,
+            api_id=API_ID,
+            api_hash=API_HASH,
+            phone_number=account.phone_number,
+        )
+
         try:
             authorized = await client.login()
+
             if not authorized:
-                AccountsTBL.set_status(account_id, "unauthorized")
-                raise ValueError(f"Account {account_id} session is not authorized")
+                AccountsTBL.set_status(
+                    account_id,
+                    "unauthorized",
+                )
+
+                raise ValueError(
+                    f"Account {account_id} session is not authorized"
+                )
 
             await client.load_me()
+
             self.clients[account_id] = client
-            self._touch(account_id)
+
             AccountsTBL.mark_connected(account_id)
-            self._log(account, "account.connect", result="connected")
+
+            self._log(
+                account,
+                "account.connect",
+                result="connected",
+            )
+
             return client
+
         except Exception as exc:
-            self._log(account, "account.connect", status="failed", error=str(exc))
+            self._log(
+                account,
+                "account.connect",
+                status="failed",
+                error=str(exc),
+            )
+
             await client.disconnect_client()
             raise
 
     async def disconnect_account(self, account_id: int) -> bool:
+        account = self.get_account(account_id)
+
         client = self.clients.pop(account_id, None)
-        account = AccountsTBL.get_account(account_id)
+
         if not client:
-            if account:
-                AccountsTBL.mark_disconnected(account_id)
+            AccountsTBL.mark_disconnected(account_id)
             return False
 
         try:
             await client.disconnect_client()
-            if account:
-                AccountsTBL.mark_disconnected(account_id)
-                self._log(account, "account.disconnect", result="disconnected")
-            return True
-        except Exception as exc:
-            if account:
-                self._log(account, "account.disconnect", status="failed", error=str(exc))
-            raise
-        finally:
-            self._last_usage.pop(account_id, None)
 
-    async def delete_account(self, account_id: int, delete_session: bool = True) -> bool:
-        account = AccountsTBL.get_account(account_id)
-        if not account:
-            return False
+            AccountsTBL.mark_disconnected(account_id)
+
+            self._log(
+                account,
+                "account.disconnect",
+                result="disconnected",
+            )
+
+            return True
+
+        except Exception as exc:
+            self._log(
+                account,
+                "account.disconnect",
+                status="failed",
+                error=str(exc),
+            )
+            raise
+
+    async def delete_account(
+        self,
+        account_id: int,
+        delete_session: bool = True,
+    ) -> bool:
+        account = self.get_account(account_id)
 
         await self.disconnect_account(account_id)
+
         session_path = account.session_path
+
+        del self.accounts[account_id]
+
         account.delete_instance(recursive=True)
+
         if delete_session and session_path:
-            delete_session_file(path=session_path + ".session")
+            delete_session_file(
+                path=session_path + ".session"
+            )
+
         return True
 
-    async def get_client(self, account_id: int) -> TelegramClient:
+    async def get_client(
+        self,
+        account_id: int,
+    ) -> TelegramClient:
+        self.get_account(account_id)
+
         client = self.clients.get(account_id)
+
         if client and client.is_connected:
-            self._touch(account_id)
             return client
+
         return await self.connect_account(account_id)
 
-    def is_connected(self, account_id: int) -> bool:
-        client = self.clients.get(account_id)
-        return bool(client and client.is_connected)
-
-    def active_accounts(self) -> list[int]:
-        return list(self.clients.keys())
-
     async def get_me(self, account_id: int):
-        return await self._run(account_id, "get_me", lambda c: c.get_me_info())
+        return await self._run(
+            account_id,
+            "get_me",
+            lambda client: client.get_me_info(),
+        )
 
-    async def get_chat(self, account_id: int, chat_id: int | str):
-        return await self._run(account_id, "get_chat", lambda c: c.get_chat(chat_id), target_id=chat_id, target_type="chat")
+    async def get_chat(
+        self,
+        account_id: int,
+        chat_id: int | str,
+    ):
+        return await self._run(
+            account_id,
+            "get_chat",
+            lambda client: client.get_chat(chat_id),
+            target_id=chat_id if isinstance(chat_id, int) else None,
+            target_type="chat",
+        )
 
-    async def get_dialogs(self, account_id: int, limit: int | None = None):
-        return await self._run(account_id, "get_dialogs", lambda c: c.get_dialogs(limit), target_type="dialogs")
+    async def get_dialogs(
+        self,
+        account_id: int,
+        limit: int | None = None,
+    ):
+        return await self._run(
+            account_id,
+            "get_dialogs",
+            lambda client: client.get_me_dialogs(limit),
+            target_type="dialogs",
+        )
 
-    async def get_groups(self, account_id: int, limit: int | None = None):
-        groups = await self._run(account_id, "get_groups", lambda c: c.get_groups(limit), target_type="groups")
-        return groups
+    async def get_groups(
+        self,
+        account_id: int,
+        limit: int | None = None,
+    ):
+        return await self._run(
+            account_id,
+            "get_groups",
+            lambda client: client.get_groups(limit),
+            target_type="groups",
+        )
 
-    async def join_group(self, account_id: int, chat_or_link: int | str):
-        result = await self._run(account_id, "join_group", lambda c: c.join_group(chat_or_link), target_type="group")
-        account = AccountsTBL.get_account(account_id)
-        if account and hasattr(result, "id"):
+    async def join_group(
+        self,
+        account_id: int,
+        chat_or_link: int | str,
+    ):
+        result = await self._run(
+            account_id,
+            "join_group",
+            lambda client: client.join_group(chat_or_link),
+            target_type="group",
+        )
+
+        account = self.get_account(account_id)
+
+        if hasattr(result, "id"):
             group = GroupsTBL.insert_group(
                 group_id=result.id,
-                group_title=getattr(result, "title", str(result.id)),
-                group_username=getattr(result, "username", None),
-                group_type=str(getattr(result, "type", "group")),
+                group_title=getattr(
+                    result,
+                    "title",
+                    str(result.id),
+                ),
+                group_username=getattr(
+                    result,
+                    "username",
+                    None,
+                ),
+                group_type=str(
+                    getattr(
+                        result,
+                        "type",
+                        "group",
+                    )
+                ),
             )
-            AccountGroupTBL.insert_group(account, group)
+
+            AccountGroupTBL.insert_group(
+                account,
+                group,
+            )
+
         return result
 
-    async def leave_group(self, account_id: int, chat_id: int | str):
-        result = await self._run(account_id, "leave_group", lambda c: c.leave_group(chat_id), target_id=chat_id, target_type="group")
+    async def leave_group(
+        self,
+        account_id: int,
+        chat_id: int | str,
+    ):
+        result = await self._run(
+            account_id,
+            "leave_group",
+            lambda client: client.leave_group(chat_id),
+            target_id=chat_id if isinstance(chat_id, int) else None,
+            target_type="group",
+        )
+
         if isinstance(chat_id, int):
-            AccountGroupTBL.mark_left(account_id, chat_id)
+            AccountGroupTBL.mark_left(
+                account_id,
+                chat_id,
+            )
+
         return result
 
-    async def send_message(self, account_id: int, chat_id: int | str, text: str, **kwargs):
+    async def send_message(
+        self,
+        account_id: int,
+        chat_id: int | str,
+        text: str,
+        **kwargs: Any,
+    ):
         return await self._run(
             account_id,
             "send_message",
-            lambda c: c.send_message_to(chat_id, text, **kwargs),
+            lambda client: client.send_message(
+                chat_id,
+                text,
+                **kwargs,
+            ),
             target_id=chat_id if isinstance(chat_id, int) else None,
             target_type="chat",
         )
 
-    async def forward_message(self, account_id: int, chat_id: int | str, from_chat_id: int | str, message_id: int):
+    async def forward_message(
+        self,
+        account_id: int,
+        chat_id: int | str,
+        from_chat_id: int | str,
+        message_id: int,
+    ):
         return await self._run(
             account_id,
             "forward_message",
-            lambda c: c.forward_message_to(chat_id, from_chat_id, message_id),
+            lambda client: client.forward_messages(
+                chat_id=chat_id,
+                from_chat_id=from_chat_id,
+                message_ids=message_id,
+            ),
             target_id=chat_id if isinstance(chat_id, int) else None,
             target_type="chat",
         )
 
-    async def get_messages(self, account_id: int, chat_id: int | str, message_ids: int | list[int]):
+    async def get_messages(
+        self,
+        account_id: int,
+        chat_id: int | str,
+        message_ids: int | list[int],
+    ):
         return await self._run(
             account_id,
             "get_messages",
-            lambda c: c.get_messages_from(chat_id, message_ids),
+            lambda client: client.get_messages(
+                chat_id,
+                message_ids,
+            ),
             target_id=chat_id if isinstance(chat_id, int) else None,
             target_type="chat",
         )
@@ -288,18 +532,19 @@ class AccountManager:
         self,
         account_id: int,
         operation: str,
-        action: Callable[[TelegramClient], Awaitable[Any]],
+        action: Callable[
+            [TelegramClient],
+            Awaitable[Any],
+        ],
         target_type: Optional[str] = None,
         target_id: Optional[int] = None,
     ):
-        account = AccountsTBL.get_account(account_id)
-        if not account:
-            raise ValueError(f"Account {account_id} not found")
-
+        account = self.get_account(account_id)
         client = await self.get_client(account_id)
+
         try:
             result = await action(client)
-            self._touch(account_id)
+
             TelegramOperationTBL.log(
                 account=account,
                 operation=operation,
@@ -308,7 +553,9 @@ class AccountManager:
                 status="success",
                 result=self._result_text(result),
             )
+
             return result
+
         except Exception as exc:
             TelegramOperationTBL.log(
                 account=account,
@@ -318,11 +565,8 @@ class AccountManager:
                 status="failed",
                 error=str(exc),
             )
-            raise
 
-    def _touch(self, account_id: int):
-        self._last_usage[account_id] = time.monotonic()
-        AccountsTBL.touch(account_id)
+            raise
 
     @staticmethod
     def _result_text(result: Any) -> str:
@@ -330,9 +574,9 @@ class AccountManager:
             return "ok"
         if isinstance(result, (str, int, float, bool)):
             return str(result)
-        data = getattr(result, "id", None)
-        if data is not None:
-            return f"id={data}"
+        result_id = getattr(result, "id", None)
+        if result_id is not None:
+            return f"id={result_id}"
         if isinstance(result, list):
             return f"count={len(result)}"
         return result.__class__.__name__
@@ -347,25 +591,6 @@ class AccountManager:
             error=error,
         )
 
-    def _clear_pending(self, phone_number: str):
+    def _clear_pending(self, phone_number: str) -> None:
         self.pending_clients.pop(phone_number, None)
         self.pending_codes.pop(phone_number, None)
-
-    async def _cleanup_pending(self, phone_number: str):
-        client = self.pending_clients.pop(phone_number, None)
-        self.pending_codes.pop(phone_number, None)
-        if client:
-            await client.disconnect_client()
-
-    async def _idle_monitor(self):
-        while self._running:
-            try:
-                await asyncio.sleep(self.check_interval)
-                now = time.monotonic()
-                for account_id, last_used in list(self._last_usage.items()):
-                    if now - last_used >= self.idle_timeout:
-                        await self.disconnect_account(account_id)
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                logger.exception("Account idle monitor failed")
