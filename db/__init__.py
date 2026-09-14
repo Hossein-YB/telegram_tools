@@ -1,11 +1,12 @@
 from .models import (
-    database,
-    UsersTBL,
-    AccountsTBL,
-    GroupsTBL,
     AccountCategoryTBL,
     AccountGroupTBL,
+    AccountsTBL,
+    ForwardHistoryTBL,
+    GroupsTBL,
     TelegramOperationTBL,
+    UsersTBL,
+    database,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "AccountCategoryTBL",
     "AccountGroupTBL",
     "TelegramOperationTBL",
+    "ForwardHistoryTBL",
 ]

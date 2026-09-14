@@ -1,8 +1,8 @@
 from typing import Optional
 
-from pyrogram import Client
+from pyrogram import Client, enums
 from pyrogram.errors import UserNotParticipant
-from pyrogram.types import Chat, User, Dialog, SentCode
+from pyrogram.types import Chat, Dialog, SentCode, User
 
 
 class TelegramClient(Client):
@@ -14,6 +14,7 @@ class TelegramClient(Client):
         phone_number: Optional[str] = None,
     ):
         self.me: Optional[User] = None
+
         super().__init__(
             name=name,
             api_id=api_id,
@@ -21,19 +22,31 @@ class TelegramClient(Client):
             phone_number=phone_number,
         )
 
-    async def login(self, phone_number: Optional[str] = None) -> bool:
+    async def login(
+        self,
+        phone_number: Optional[str] = None,
+    ) -> bool:
         phone = phone_number or self.phone_number
+
         if not phone:
             raise ValueError("phone_number is required")
+
         authorized = await self.connect()
+
         if authorized:
             await self.load_me()
+
         return authorized
 
-    async def send_code(self, phone_number: Optional[str] = None) -> SentCode:
+    async def send_code(
+        self,
+        phone_number: Optional[str] = None,
+    ) -> SentCode:
         phone = phone_number or self.phone_number
+
         if not phone:
             raise ValueError("phone_number is required")
+
         return await super().send_code(phone)
 
     async def sign_in(
@@ -58,23 +71,47 @@ class TelegramClient(Client):
     async def get_me_info(self) -> User:
         return await self.load_me()
 
-    async def get_me_dialogs(self, limit: Optional[int] = None) -> list[Dialog]:
+    async def get_all_dialogs(
+        self,
+        limit: Optional[int] = None,
+    ) -> list[Dialog]:
         dialogs: list[Dialog] = []
+
         async for dialog in super().get_dialogs():
             dialogs.append(dialog)
+
             if limit is not None and len(dialogs) >= limit:
                 break
+
         return dialogs
 
-    async def get_groups(self, limit: Optional[int] = None) -> list[Chat]:
+    async def get_dialogs(
+        self,
+        limit: Optional[int] = None,
+    ) -> list[Chat]:
+        return await self.get_groups(limit)
+
+    async def get_groups(
+        self,
+        limit: Optional[int] = None,
+    ) -> list[Chat]:
         groups: list[Chat] = []
+
         async for dialog in super().get_dialogs():
             chat = dialog.chat
-            if chat.type in ("group", "supergroup"):
-                groups.append(chat)
-                if limit is not None and len(groups) >= limit:
-                    break
+
+            if chat.type not in (enums.ChatType.GROUP, enums.ChatType.SUPERGROUP):
+                continue
+
+            groups.append(chat)
+
+            if limit is not None and len(groups) >= limit:
+                break
+
         return groups
+
+    async def get_chat(self, chat_id: int | str) -> Chat:
+        return await super().get_chat(chat_id)
 
     async def join_group(self, chat_or_link: int | str) -> Chat:
         return await super().join_chat(chat_or_link)
@@ -85,11 +122,24 @@ class TelegramClient(Client):
     async def is_member(self, chat_id: int | str) -> bool:
         if self.me is None:
             await self.load_me()
+
         try:
             await self.get_chat_member(chat_id, self.me.id)
             return True
         except UserNotParticipant:
             return False
+
+    async def forward_messages(
+        self,
+        chat_id: int | str,
+        from_chat_id: int | str,
+        message_ids: int | list[int],
+    ):
+        return await super().forward_messages(
+            chat_id=chat_id,
+            from_chat_id=from_chat_id,
+            message_ids=message_ids,
+        )
 
     async def disconnect_client(self) -> None:
         if self.is_connected:

@@ -1,11 +1,15 @@
+from client_manager.admin.account_manager import AccountCommands
 from client_manager.admin.admin_panel import AdminPanel
-from client_manager.admin.user_manager import UserManager
-from client_manager.admin.account_manager import AccountManager
+from client_manager.admin.operator_manager import OperatorManager
+from client_manager.admin.sudo_manager import SudoManager
+from client_manager.operator.forwarding import Forwarding
 
 
 class AdminCommand(
     AdminPanel,
-    UserManager,
-    AccountManager,
+    OperatorManager,
+    SudoManager,
+    AccountCommands,
+    Forwarding,
 ):
     pass
