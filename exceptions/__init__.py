@@ -1,7 +1,7 @@
-from .base import BaseException
+from .base import BotBaseException
 from .sudo_exception import UserIsSudo
 
 __all__ = [
-    "BaseException",
+    "BotBaseException",
     "UserIsSudo",
 ]

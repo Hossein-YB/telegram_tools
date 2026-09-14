@@ -15,9 +15,6 @@ class Keyboards:
     SHOW_USERS_TXT = "کاربران"
     SHOW_USERS_CALL = "a_sh_users"
 
-    ADD_NEW_OPERATOR_TXT = "اضافه کردن کاربر"
-    ADD_NEW_OPERATOR_CALL = "a_ad_user"
-
     SHOW_ACCOUNTS_TXT = "اکانت ها"
     SHOW_ACCOUNTS_CALL = "a_sh_account"
 
@@ -61,6 +58,9 @@ class Keyboards:
 
     FORWARD_ALL_TXT = "همه گروه ها"
     FORWARD_SEND_TXT = "فروارد 🚀"
+
+    JOIN_GROUP_TXT = "➕ جوین با لینک"
+    REFRESH_GROUPS_TXT = "🔄 بروزرسانی لیست"
 
     @classmethod
     def generate_cancel_key(cls):
@@ -374,6 +374,56 @@ class Keyboards:
         )
 
         return InlineKeyboardMarkup(rows)
+
+    @classmethod
+    def generate_group_accounts_keyboard(cls, accounts):
+        rows = []
+
+        for account in accounts:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"📱 {account.display_name} · #{account.account_id}",
+                        callback_data=f"grp:{account.account_id}",
+                    )
+                ]
+            )
+
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=cls.BACK_TXT,
+                    callback_data=cls.BACK_CALL,
+                )
+            ]
+        )
+
+        return InlineKeyboardMarkup(rows)
+
+    @classmethod
+    def generate_account_groups_keyboard(cls, account_id: int):
+        return InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        text=cls.JOIN_GROUP_TXT,
+                        callback_data=f"grp:join:{account_id}",
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=cls.REFRESH_GROUPS_TXT,
+                        callback_data=f"grp:refresh:{account_id}",
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=cls.BACK_TXT,
+                        callback_data=cls.SHOW_GROUPS_CALL,
+                    ),
+                ],
+            ]
+        )
 
     @classmethod
     def generate_operator_list(cls, users):

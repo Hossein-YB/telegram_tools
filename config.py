@@ -13,6 +13,7 @@ SUDO_IDS = config("SUDO_ID", cast=lambda v: [int(s.strip()) for s in v.split(','
 DB_NAME = config("DB_NAME")
 DB_USER = config("DB_USER")
 DB_USER_PASS = config("DB_USER_PASS")
+DB_HOST = config("DB_HOST", default="127.0.0.1")
 DB_PORT = config("DB_PORT", cast=int)
 
 # Base directory

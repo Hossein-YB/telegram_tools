@@ -15,7 +15,7 @@ from peewee import (
 from playhouse.pool import PooledMySQLDatabase
 from playhouse.shortcuts import ReconnectMixin
 
-from config import DB_NAME, DB_PORT, DB_USER, DB_USER_PASS
+from config import DB_HOST, DB_NAME, DB_PORT, DB_USER, DB_USER_PASS
 from exceptions import UserIsSudo
 
 
@@ -27,6 +27,7 @@ database = ReconnectMySQLDatabase(
     database=DB_NAME,
     user=DB_USER,
     passwd=DB_USER_PASS,
+    host=DB_HOST,
     port=DB_PORT,
     charset="utf8mb4",
 )

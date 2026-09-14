@@ -70,6 +70,30 @@ class Handlers:
         )
         self.add_handler(
             CallbackQueryHandler(
+                self.show_groups,
+                filters.regex(r"^a_groups$"),
+            )
+        )
+        self.add_handler(
+            CallbackQueryHandler(
+                self.join_group_callback,
+                filters.regex(r"^grp:join:\d+$"),
+            )
+        )
+        self.add_handler(
+            CallbackQueryHandler(
+                self.refresh_account_groups_callback,
+                filters.regex(r"^grp:refresh:\d+$"),
+            )
+        )
+        self.add_handler(
+            CallbackQueryHandler(
+                self.show_account_groups_callback,
+                filters.regex(r"^grp:\d+$"),
+            )
+        )
+        self.add_handler(
+            CallbackQueryHandler(
                 self.sudo_panel,
                 filters.regex(r"^s_panel$"),
             )

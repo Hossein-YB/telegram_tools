@@ -140,7 +140,7 @@ class AdminPanel:
         account = manager.get_account(account_id)
 
         if enabled:
-            manager.activate_account(account_id)
+            await manager.activate_account(account_id)
         else:
             await manager.disable_account(account_id)
 

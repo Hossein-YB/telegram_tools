@@ -1,6 +1,7 @@
 Kurigram==2.2.23
 packaging==26.2
 peewee==3.18.1
+PyMySQL==1.1.1
 pyaes==1.6.1
 python-decouple==3.8
 python-socks==2.8.1

@@ -524,6 +524,40 @@ class AccountManager:
             target_type="groups",
         )
 
+    async def sync_account_groups(
+        self,
+        account_id: int,
+    ) -> list[AccountGroupTBL]:
+        """Fetch the account's current Telegram groups live and mirror them
+        into the local DB (GroupsTBL/AccountGroupTBL).
+
+        Groups that are no longer among the account's dialogs are marked as
+        left, so the saved list stays a faithful copy of what the account is
+        actually a member of.
+        """
+        account = self.get_account(account_id)
+        chats = await self.get_groups(account_id)
+
+        current_ids: set[int] = set()
+
+        for chat in chats:
+            current_ids.add(chat.id)
+            group = GroupsTBL.insert_group(
+                group_id=chat.id,
+                group_title=getattr(chat, "title", str(chat.id)),
+                group_username=getattr(chat, "username", None),
+                group_type=str(getattr(chat, "type", "group")),
+            )
+            AccountGroupTBL.insert_group(account, group)
+
+        for relation in AccountGroupTBL.get_account_groups(account_id, joined_only=True):
+            if relation.group_id not in current_ids:
+                AccountGroupTBL.mark_left(account_id, relation.group_id)
+
+        return list(
+            AccountGroupTBL.get_account_groups(account_id, joined_only=True)
+        )
+
     async def join_group(
         self,
         account_id: int,

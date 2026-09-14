@@ -26,6 +26,13 @@ class Messages:
     FORWARD_FINISHED = "فروارد تمام شد."
     FORWARD_FAILED = "فروارد با خطا تمام شد."
 
+    SELECT_ACCOUNT_FOR_GROUPS = "برای دیدن گروه‌ها، اکانت را انتخاب کنید:"
+    FETCHING_GROUPS = "در حال دریافت لیست گروه‌ها از تلگرام..."
+    JOIN_GROUP_PROMPT = (
+        "لینک یا یوزرنیم گروه/کانال را ارسال کنید (مثلاً https://t.me/example یا @example).\n"
+        "می‌توانید چند لینک پشت سر هم بفرستید. برای پایان، لغو را بزنید."
+    )
+
     @classmethod
     def generate_confirm_user_add(cls, name, user_id):
         return (
@@ -91,6 +98,27 @@ class Messages:
             f"فعال بودن: {active}\n"
             f"مجوز تلگرام: {authorized}"
         )
+
+    @classmethod
+    def account_groups_list(cls, account, relations):
+        lines = [f"📱 گروه‌های اکانت {account.display_name}:"]
+
+        if not relations:
+            lines.append("\nاین اکانت در حال حاضر عضو هیچ گروهی نیست.")
+            return "\n".join(lines)
+
+        for relation in relations:
+            group = relation.group
+            username = f" (@{group.group_username})" if group.group_username else ""
+            lines.append(f"• {group.group_title}{username}")
+
+        return "\n".join(lines)
+
+    @classmethod
+    def group_joined(cls, group):
+        username = f" (@{group.username})" if getattr(group, "username", None) else ""
+        title = getattr(group, "title", None) or str(getattr(group, "id", "؟"))
+        return f"✅ عضویت در «{title}»{username} با موفقیت انجام شد."
 
     @classmethod
     def operation_report(cls, operations, title="گزارش عملیات"):
